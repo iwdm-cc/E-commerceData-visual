@@ -2,7 +2,16 @@ import Vue from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
+import axios from 'axios'
+//引入字体文件
+import './assets/font/iconfont.css'
+axios.defaults.baseURL = 'http://127.0.0.1:8888/api/'
+//将axios对象挂载到vue原型上
+//别的组件中，使用$http
+Vue.prototype.$http = axios
 
+//将全局echarts对象挂载到vue原型上
+Vue.prototype.$echarts = window.echarts
 Vue.config.productionTip = false
 
 new Vue({

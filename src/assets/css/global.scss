@@ -1,0 +1,22 @@
+ @mixin nice {
+   width: 100%;
+   height: 100%;
+   overflow: hidden;
+ }
+html,body,#app{
+@include nice;
+  padding: 0;
+  margin: 0;
+}
+.com-page{
+  @include nice;
+}
+.com-container{
+  @include nice;
+}
+.com-chart{
+  @include nice;
+}
+canvas{
+  border-radius: 20px;
+}

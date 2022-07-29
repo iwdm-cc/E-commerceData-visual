@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
+import ScreenPage from '../views/ScreenPage'
 import SellerPage from '../views/SellerPage.vue'
 import TrendPage from '../views/TrendPage.vue'
 import MapPage from '../views/MapPage.vue'
@@ -9,6 +10,15 @@ import ScalePage from '../views/ScalePage'
 Vue.use(VueRouter)
 
 const routes = [
+  {
+    path:'/',
+    redirect: '/screen'
+  },
+  {
+    path:'/screen',
+    name:'screen',
+    component:ScreenPage
+  },
   {
     path: '/sellerPage',
     name: 'SellerPage',

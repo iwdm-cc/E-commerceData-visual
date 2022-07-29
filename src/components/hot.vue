@@ -9,6 +9,8 @@
 </template>
 
 <script>
+  import {mapState} from 'vuex'
+  import {getThemeValue} from '../utils/theme_utils'
   export default {
     name: "hot",
     data() {
@@ -19,18 +21,28 @@
         titleFontSize:0
       }
     },
+    created(){
+      //组件创建时进行回调函数的注册
+      this.$socket.registerCallBack('hotData',this.getData)
+    },
     mounted() {
       this.initChart()
-      this.getData()
+      this.$socket.send({
+        action:'getData',
+        socketType:'hotData',
+        chartName:'hotproduct',
+        value:''
+      })
       window.addEventListener('resize', this.screenUpdate)
       this.screenUpdate()
     },
     destroyed() {
       window.removeEventListener('resize', this.screenUpdate)
+      this.$socket.unRegisterCallBack('hotData')
     },
     methods: {
       initChart() {
-        this.chartInstance = this.$echarts.init(this.$refs.hot, 'chalk')
+        this.chartInstance = this.$echarts.init(this.$refs.hot, this.theme)
         const initOption = {
           title: {
             text: '▎热销商品占比',
@@ -38,7 +50,7 @@
             top: 20,
           },
           legend: {
-            top: '12%',
+            top: '15%',
             icon: 'circle'
           },
           tooltip: {
@@ -77,8 +89,8 @@
         }
         this.chartInstance.setOption(initOption)
       },
-      async getData() {
-        const {data: ret} = await this.$http.get('hotproduct')
+      async getData(ret) {
+        // const {data: ret} = await this.$http.get('hotproduct')
         this.allData = ret
         this.updateChart()
       },
@@ -111,20 +123,20 @@
         const adapterOption = {
           title:{
             textStyle:{
-              fontSize:this.titleFontSize/1.5,
+              fontSize:this.titleFontSize,
             }
           },
           legend:{
-            itemWidth:this.titleFontSize/2,
-            itemHeight:this.titleFontSize/2,
+            itemWidth:this.titleFontSize,
+            itemHeight:this.titleFontSize,
             itemGap:this.titleFontSize/2,
             textStyle:{
-              fontSize:this.titleFontSize/2
+              fontSize:this.titleFontSize/1.5
             }
           },
           series:[
             {
-              radius:this.titleFontSize*4.5,
+              radius:this.titleFontSize*5,
               center:['50%','60%'],
               label:{
                 fontSize:this.titleFontSize/3
@@ -160,7 +172,19 @@
         }
       },
       comStyle(){
-        return {fontSize:this.titleFontSize + 'px'}
+        return {
+          fontSize:this.titleFontSize*1.2 + 'px',
+          color:getThemeValue(this.theme).titleColor
+        }
+      },
+      ...mapState(['theme'])
+    },
+    watch: {
+      theme() {
+        this.chartInstance.dispose()//销毁当前的图表
+        this.initChart() //重新初始化图表
+        this.screenUpdate()//完成屏幕的视频
+        this.updateChart()//更新图表的展示
       }
     }
   }

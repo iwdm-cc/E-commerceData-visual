@@ -12,6 +12,7 @@ html,body,#app{
   @include nice;
 }
 .com-container{
+  position: relative;
   @include nice;
 }
 .com-chart{

@@ -6,6 +6,7 @@
 </template>
 
 <script>
+  import {mapState} from 'vuex'
   export default {
     name: "seller",
     data() {
@@ -17,26 +18,36 @@
         timeId: null,
       }
     },
+    created(){
+      //组件创建时进行回调函数的注册
+      this.$socket.registerCallBack('sellerData',this.getData)
+    },
     mounted() {
       this.initChart()
-      this.getData()
+      this.$socket.send({
+        action:'getData',
+        socketType:'sellerData',
+        chartName:'seller',
+        value:''
+      })
       window.addEventListener('resize', this.screenUpdate)
       this.screenUpdate()
     },
     destroyed() {
       clearInterval(this.timeId)
       window.removeEventListener('resize', this.screenUpdate)
+      this.$socket.unRegisterCallBack('sellerData')
     },
     methods: {
       //初始化echartInstance对象
       initChart() {
-        this.chartInstance = this.$echarts.init(this.$refs.seller, 'chalk')
+        this.chartInstance = this.$echarts.init(this.$refs.seller, this.theme)
         //对图表初始化配置的控制
         const initOption = {
           title: {
             text: '▎商家销售统计',
-            left: 35,
-            top: 30,
+            left:15,
+            top: 10,
           },
           grid: {
             top:'15%',
@@ -90,9 +101,9 @@
         })
       },
       //获取服务器数据
-      async getData() {
-        const ret = await this.$http.get('seller')
-        this.allData = ret.data
+      async getData(ret) {
+        // const ret = await this.$http.get('seller')
+        this.allData = ret
         //对数据进行排序
         this.allData.sort((a, b) => {
           return a.value - b.value  //从小到大的排序
@@ -148,7 +159,7 @@
         const adapterOption = {
           title: {
             textStyle: {
-              fontsize: titleFontSize
+              fontSize: titleFontSize
             },
           },
           tooltip: {
@@ -169,6 +180,17 @@
         }
         this.chartInstance.setOption(adapterOption)
         this.chartInstance.resize()
+      }
+    },
+    computed: {
+      ...mapState(['theme'])
+    },
+    watch: {
+      theme() {
+        this.chartInstance.dispose()//销毁当前的图表
+        this.initChart() //重新初始化图表
+        this.screenUpdate()//完成屏幕的视频
+        this.updateChart()//更新图表的展示
       }
     }
   }

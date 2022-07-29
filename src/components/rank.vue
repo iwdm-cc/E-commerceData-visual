@@ -6,6 +6,7 @@
 </template>
 
 <script>
+  import {mapState} from 'vuex'
   export default {
     name: "rank",
     data(){
@@ -17,25 +18,35 @@
         timeId:null,
       }
     },
+    created(){
+      //组件创建时进行回调函数的注册
+      this.$socket.registerCallBack('rankData',this.getData)
+    },
     mounted() {
       this.initChart()
-      this.getData()
+      this.$socket.send({
+        action:'getData',
+        socketType:'rankData',
+        chartName:'rank',
+        value:''
+      })
       window.addEventListener('resize', this.screenUpdate)
       this.screenUpdate()
     },
     destroyed() {
       window.removeEventListener('resize', this.screenUpdate)
       clearInterval(this.timeId)
+      this.$socket.unRegisterCallBack('rankData')
     },
     methods:{
       //初始化echartInstance对象
       initChart(){
-        this.chartInstance = this.$echarts.init(this.$refs.rank, 'chalk')
+        this.chartInstance = this.$echarts.init(this.$refs.rank,this.theme)
         const initOption = {
           title:{
             text:'▎地区销售排行',
-            left:20,
-            top:20,
+            left:10,
+            top:5,
           },
           grid:{
             top:'25%',
@@ -72,8 +83,8 @@
           this.startInterval()
         })
       },
-      async getData(){
-        const {data:ret} = await this.$http.get('rank')
+      async getData(ret){
+        // const {data:ret} = await this.$http.get('rank')
         this.allData = ret
         //对数据进行排序
         this.allData.sort((a, b) => {
@@ -132,8 +143,8 @@
         //和分辨率大小有关的配置项
         const adapterOption = {
           title:{
-            titleStyle:{
-                fontSize:titleFontSize/2
+            textStyle:{
+                fontSize:titleFontSize/1.5
             }
           },
           series:[
@@ -162,6 +173,17 @@
           }
           this.updateChart()
         },2000)
+      }
+    },
+    computed: {
+      ...mapState(['theme'])
+    },
+    watch: {
+      theme() {
+        this.chartInstance.dispose()//销毁当前的图表
+        this.initChart() //重新初始化图表
+        this.screenUpdate()//完成屏幕的视频
+        this.updateChart()//更新图表的展示
       }
     }
   }

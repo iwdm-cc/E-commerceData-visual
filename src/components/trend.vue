@@ -14,6 +14,8 @@
 </template>
 
 <script>
+  import {mapState} from 'vuex'
+  import {getThemeValue} from '../utils/theme_utils'
   export default {
     name: "trend",
     data() {
@@ -25,18 +27,31 @@
         titleFontSize: 0,
       }
     },
+    created(){
+      //组件创建时进行回调函数的注册
+      this.$socket.registerCallBack('trendData',this.getData)
+    },
     mounted() {
       this.initChart()
-      this.getData()
+      // this.getData()
+      //发送数据给服务器，告诉服务器，我现在需要获取数据
+      this.$socket.send({
+        action:'getData',
+        socketType:'trendData',
+        chartName:'trend',
+        value:''
+      })
       window.addEventListener('resize', this.screenUpdate)
       this.screenUpdate()
     },
     destroyed() {
       window.removeEventListener('resize', this.screenUpdate)
+      //组件销毁时对回调函数的注销
+      this.$socket.unRegisterCallBack('trendData')
     },
     methods: {
       initChart() {
-        this.chartInstance = this.$echarts.init(this.$refs.Trend, 'chalk')
+        this.chartInstance = this.$echarts.init(this.$refs.Trend, this.theme)
         const initOption = {
           grid: {
             top: '27%',
@@ -59,9 +74,11 @@
         }
         this.chartInstance.setOption(initOption)
       },
-      async getData() {
-        const ret = await this.$http.get('trend')
-        this.allData = ret.data
+      //ret 是服务端发送给客户端的数据
+      getData(ret) {
+        // const ret = await this.$http.get('trend')
+        this.allData = ret
+        // console.log(this.allData)
         this.updateChart()
       },
       updateChart() {
@@ -111,6 +128,7 @@
           },
           legend: {
             data: legendArr,
+            top:'15%'
           },
           series: seriesArr,
 
@@ -121,11 +139,11 @@
         this.titleFontSize = this.$refs.Trend.offsetWidth / 100 * 3.6
         const adapterOption = {
           legend: {
-            itemWidth: this.titleFontSize/2,
-            itemHeight: this.titleFontSize/2,
+            itemWidth: this.titleFontSize,
+            itemHeight: this.titleFontSize,
             itemGap: this.titleFontSize,
             textStyle: {
-              fontSize: this.titleFontSize/2.5
+              fontSize: this.titleFontSize/1.5
             }
           }
         }
@@ -158,14 +176,26 @@
           return this.allData[this.choiceType].title
         }
       },
+
+
       //标题字体大小
       comStyle() {
         return {
-          fontSize: this.titleFontSize / 1.7 + 'px'
+          fontSize: this.titleFontSize /1.15 + 'px' ,
+          color:getThemeValue(this.theme).titleColor
         }
       },
       marginStyle(){
         return {marginLeft: this.titleFontSize/2.5 + 'px'}
+      },
+      ...mapState(['theme']),
+    },
+    watch: {
+      theme() {
+        this.chartInstance.dispose()//销毁当前的图表
+        this.initChart() //重新初始化图表
+        this.screenUpdate()//完成屏幕的视频
+        this.updateChart()//更新图表的展示
       }
     }
   }
@@ -174,10 +204,11 @@
 <style scoped lang="scss">
     .title {
         position: absolute;
-        left: 55px;
-        top: 25px;
+        left: 35px;
+        top: 20px;
         z-index: 9;
         color: white;
+        font-weight:bold;
         .title-icon {
             margin-left: 10px;
             cursor: pointer; /*鼠标移上的效果*/

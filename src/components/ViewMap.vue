@@ -7,6 +7,7 @@
 </template>
 
 <script>
+  import {mapState} from 'vuex'
   import axios from 'axios'
   import {getProvinceMapInfo} from '../utils/map_utils'
 
@@ -19,18 +20,28 @@
         mapData:{},//省份地图数据缓存
       }
     },
+    created(){
+      //组件创建时进行回调函数的注册
+      this.$socket.registerCallBack('mapData',this.getData)
+    },
     mounted() {
       this.initChart()
-      this.getData()
+      this.$socket.send({
+        action:'getData',
+        socketType:'mapData',
+        chartName:'map',
+        value:''
+      })
       window.addEventListener('resize', this.screenUpdate)
       this.screenUpdate()
     },
     destroyed() {
       window.removeEventListener('resize', this.screenUpdate)
+      this.$socket.unRegisterCallBack('mapData')
     },
     methods: {
       async initChart() {
-        this.chartInstance = this.$echarts.init(this.$refs.map, 'chalk')
+        this.chartInstance = this.$echarts.init(this.$refs.map, this.theme)
         //获取的地图数据不是位于koa后台，所以不用this.$http
         const ret = await axios.get('http://localhost:8999/static/map/china.json')
         this.allData = ret.data
@@ -78,8 +89,8 @@
           this.chartInstance.setOption(changeOption)
         })
       },
-      async getData() {
-        const {data: ret} = await this.$http.get('map')
+      async getData(ret) {
+        // const {data: ret} = await this.$http.get('map')
         this.allData = ret
         // console.log(this.allData)
         this.updateChart()
@@ -140,6 +151,17 @@
           }
         }
         this.chartInstance.setOption(revertOption)
+      }
+    },
+    computed: {
+      ...mapState(['theme'])
+    },
+    watch: {
+      theme() {
+        this.chartInstance.dispose()//销毁当前的图表
+        this.initChart() //重新初始化图表
+        this.screenUpdate()//完成屏幕的视频
+        this.updateChart()//更新图表的展示
       }
     }
   }

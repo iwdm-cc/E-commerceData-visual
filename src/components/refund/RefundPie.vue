@@ -2,17 +2,18 @@
   <div class="com-container">
     <div class="title" :style="comStyle">
       <span>{{ '▎' + showTitle }}</span>
-      <span class="category">
-        <div 
-          class="category-item" 
-          v-for="item in pieTypes" 
-          :key="item.key"
-          :class="{ active: currentType === item.key }"
-          @click="handleSelect(item.key)"
-        >{{ item.text }}</div>
-      </span>
+      <div class="type-selector">
+        <div
+          v-for="(item, index) in typeOptions"
+          :key="index"
+          :class="['type-item', currentType === item.type ? 'active' : '']"
+          @click="handleTypeChange(item.type)"
+        >
+          {{ item.text }}
+        </div>
+      </div>
     </div>
-    <div class="com-chart" ref="RefundPie"></div>
+    <div class="com-chart" ref="refund_pie"></div>
   </div>
 </template>
 
@@ -32,47 +33,21 @@ export default {
     return {
       chartInstance: null,
       allData: null,
-      currentType: 'category',
+      currentType: 'category', // 默认显示类别分布
       titleFontSize: 0,
-      pieColors: [
-        ['#80FFA5', '#00DDFF'],
-        ['#37A2FF', '#7337FF'],
-        ['#FFBF00', '#FF8A00'],
-        ['#FF4949', '#FF0000'],
-        ['#00EAFF', '#188df0'],
-        ['#EC0C20', '#FE8A4B'],
-        ['#FEBD69', '#FF3366'],
-        ['#9F8BFF', '#5A61FF'],
-        ['#FF9A9A', '#FF3C47'],
-        ['#43E7FE', '#4B9AFE']
+      innerTitle: '退款分布',
+      typeOptions: [
+        { type: 'category', text: '类别分布' },
+        { type: 'reason', text: '原因分布' }
+      ],
+      colorList: [
+        { start: '#FFA07A', end: '#FF6347' },
+        { start: '#87CEEB', end: '#4169E1' },
+        { start: '#98FB98', end: '#32CD32' },
+        { start: '#DDA0DD', end: '#9370DB' },
+        { start: '#F0E68C', end: '#DAA520' }
       ]
     }
-  },
-  computed: {
-    showTitle() {
-      if (!this.allData) return "退款分布";
-      return this.allData.title
-    },
-    comStyle() {
-      return {
-        fontSize: this.titleFontSize / 1.15 + 'px',
-        color: getThemeValue(this.theme).titleColor
-      }
-    },
-    pieTypes() {
-      if (!this.allData) {
-        return [
-          { key: 'category', text: '品类' },
-          { key: 'reason', text: '原因' }
-        ]
-      } else {
-        return this.allData.type || [
-          { key: 'category', text: '品类' },
-          { key: 'reason', text: '原因' }
-        ]
-      }
-    },
-    ...mapState(['theme'])
   },
   created() {
     if (this.data && Object.keys(this.data).length > 0) {
@@ -83,241 +58,233 @@ export default {
   },
   mounted() {
     this.initChart()
+    this.screenAdapter()
+
     if (this.allData) {
       this.updateChart()
     } else {
-      this.$socket.send({
-        action: 'getData',
-        socketType: 'refundPieData',
-        chartName: 'refundPie',
-        value: ''
-      })
+      this.requestData()
     }
+
     window.addEventListener('resize', this.screenAdapter)
-    this.screenAdapter()
   },
   destroyed() {
     window.removeEventListener('resize', this.screenAdapter)
     if (!this.data || Object.keys(this.data).length === 0) {
       this.$socket.unRegisterCallBack('refundPieData')
     }
+    this.chartInstance && this.chartInstance.dispose()
   },
   methods: {
     initChart() {
-      this.chartInstance = this.$echarts.init(this.$refs.RefundPie, this.theme)
+      this.chartInstance = this.$echarts.init(this.$refs.refund_pie, this.theme)
       const initOption = {
         tooltip: {
           trigger: 'item',
           formatter: '{b}: {c} ({d}%)',
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
           borderWidth: 0,
-          textStyle: {
-            fontSize: 14
-          }
+          padding: [10, 15]
+        },
+        grid: {
+          containLabel: true
         },
         legend: {
+          type: 'scroll',
           orient: 'vertical',
           right: '5%',
-          top: 'middle',
-          itemWidth: 14,
-          itemHeight: 14,
-          icon: 'circle',
+          top: '15%',
+          bottom: '15%',
+          itemWidth: 10,
+          itemHeight: 10,
+          itemGap: 12,
+          pageButtonGap: 10,
+          pageButtonItemGap: 5,
+          pageButtonPosition: 'end',
+          pageFormatter: '{current}/{total}',
+          pageIconColor: getThemeValue(this.theme).textColor,
+          pageIconInactiveColor: 'rgba(255, 255, 255, 0.3)',
+          pageIconSize: 12,
+          pageTextStyle: {
+            color: getThemeValue(this.theme).textColor
+          },
           textStyle: {
-            color: 'rgba(255,255,255,0.8)',
-            fontSize: 14
+            color: getThemeValue(this.theme).textColor,
+            fontSize: 12,
+            overflow: 'truncate',
+            width: 80
+          },
+          formatter: name => {
+            const data = this.chartInstance.getOption().series[0].data;
+            const target = data.find(item => item.name === name);
+            if (target) {
+              const value = target.value;
+              if (value >= 1000) {
+                return `${name}  ${(value/1000).toFixed(1)}k`;
+              }
+              return `${name}  ${value}`;
+            }
+            return name;
           }
         },
         series: [
           {
             name: '退款分布',
             type: 'pie',
-            radius: ['40%', '70%'],
-            center: ['40%', '50%'],
+            radius: ['30%', '55%'],
+            center: ['32%', '50%'],
             avoidLabelOverlap: true,
+            minShowLabelAngle: 3,
             itemStyle: {
-              borderRadius: 10,
-              borderColor: 'rgba(0, 0, 0, 0.1)',
-              borderWidth: 2
+              borderRadius: 6,
+              borderColor: '#fff',
+              borderWidth: 1
             },
             label: {
-              show: false
-            },
-            emphasis: {
-              label: {
-                show: true,
-                fontSize: 16,
-                fontWeight: 'bold',
-                formatter: '{b}: {c} ({d}%)'
+              show: true,
+              position: 'outside',
+              formatter: params => {
+                const value = params.value;
+                let valueStr = value.toString();
+                if (value >= 1000) {
+                  valueStr = (value/1000).toFixed(1) + 'k';
+                }
+                return `${params.name}\n${valueStr}(${params.percent}%)`;
               },
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
+              color: getThemeValue(this.theme).textColor,
+              fontSize: 12,
+              lineHeight: 16,
+              padding: [4, 8],
+              backgroundColor: 'rgba(0,0,0,0.1)',
+              borderRadius: 4,
+              alignTo: 'edge',
+              edgeDistance: '10%',
+              distanceToLabelLine: 5
             },
             labelLine: {
-              show: false
+              show: true,
+              length: 10,
+              length2: 10,
+              maxSurfaceAngle: 80,
+              smooth: true,
+              lineStyle: {
+                width: 1,
+                type: 'solid'
+              }
             },
             data: []
           }
         ]
       }
       this.chartInstance.setOption(initOption)
-      this.chartInstance.on('mouseover', params => {
-        const isDataItem = params.seriesType === 'pie'
-        if (isDataItem) {
-          const centerX = this.chartInstance.getWidth() * 0.4
-          const centerY = this.chartInstance.getHeight() * 0.5
-          
-          const point = {
-            x: centerX + (Math.sin(params.percent * Math.PI * 2) * this.chartInstance.getWidth() * 0.3),
-            y: centerY - (Math.cos(params.percent * Math.PI * 2) * this.chartInstance.getHeight() * 0.3)
-          }
-          
-          this.chartInstance.dispatchAction({
-            type: 'showTip',
-            seriesIndex: 0,
-            dataIndex: params.dataIndex,
-            position: [point.x, point.y]
-          })
-        }
+    },
+    requestData() {
+      this.$socket.send({
+        action: 'getData',
+        socketType: 'refundPieData',
+        chartName: 'refundPie',
+        value: this.currentType
       })
     },
-    processPieData(data) {
-      if (!data || !data.data || !Array.isArray(data.data)) {
-        console.warn('Invalid pie data format')
-        return []
-      }
-
-      return data.data.map((item, index) => ({
-        name: item.name || `未命名${index + 1}`,
-        value: this.validateValue(item.value),
-        itemStyle: {
-          color: this.getGradientColor(index)
-        }
-      }))
-    },
-    validateValue(value) {
-      const num = parseFloat(value)
-      return isNaN(num) ? 0 : num
-    },
-    getGradientColor(index) {
-      const colors = this.pieColors[index % this.pieColors.length]
-      return new this.$echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: colors[0] },
-        { offset: 1, color: colors[1] }
-      ])
+    getData(ret) {
+      this.allData = ret
+      this.updateChart()
     },
     updateChart() {
       if (!this.allData) return
+
       const currentData = this.allData[this.currentType]
       if (!currentData || !currentData.data) return
-      
-      console.log('当前饼图数据：', currentData)
-      
-      const pieData = currentData.data.map((item, index) => ({
+
+      const data = currentData.data.map((item, index) => ({
         name: item.name,
         value: item.value,
         itemStyle: {
           color: new this.$echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: this.pieColors[index % this.pieColors.length][0] },
-            { offset: 1, color: this.pieColors[index % this.pieColors.length][1] }
+            { offset: 0, color: this.colorList[index % this.colorList.length].start },
+            { offset: 1, color: this.colorList[index % this.colorList.length].end }
           ])
         }
       }))
 
       const option = {
-        legend: {
-          orient: 'vertical',
-          right: '5%',
-          top: 'middle',
-          data: pieData.map(item => item.name)
-        },
         series: [{
-          name: '退款分布',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['40%', '50%'],
-          data: pieData,
-          label: {
-            show: true,
-            formatter: '{b}: {c} ({d}%)',
-            fontSize: 12
-          },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 14,
-              fontWeight: 'bold'
-            },
-            itemStyle: {
-              shadowBlur: 10,
-              shadowOffsetX: 0,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          }
+          data: data
         }]
       }
-      
+
       this.chartInstance.setOption(option)
     },
-    getData(ret) {
-      try {
-        if (!ret || typeof ret !== 'object') {
-          throw new Error('Invalid data received')
-        }
-        this.allData = ret
+    handleTypeChange(type) {
+      this.currentType = type
+      if (!this.allData) {
+        this.requestData()
+      } else {
         this.updateChart()
-      } catch (error) {
-        console.error('Error processing pie data:', error)
-        // 可以在这里添加错误提示UI
       }
     },
     screenAdapter() {
-      this.titleFontSize = this.$refs.RefundPie.offsetWidth / 100 * 3.6
-      const fontSize = this.titleFontSize / 1.15
+      const containerWidth = this.$refs.refund_pie.offsetWidth
+      const containerHeight = this.$refs.refund_pie.offsetHeight
+      this.titleFontSize = Math.min(containerWidth, containerHeight) / 100 * 3.6
       
       const adapterOption = {
-        tooltip: {
-          textStyle: {
-            fontSize: fontSize * 0.8
-          }
-        },
         legend: {
-          itemWidth: fontSize * 0.8,
-          itemHeight: fontSize * 0.8,
+          itemWidth: Math.min(this.titleFontSize * 0.7, 10),
+          itemHeight: Math.min(this.titleFontSize * 0.7, 10),
+          itemGap: Math.min(this.titleFontSize * 0.8, 12),
           textStyle: {
-            fontSize: fontSize * 0.8
+            fontSize: Math.min(this.titleFontSize * 0.7, 12)
           }
         },
         series: [
           {
+            radius: [
+              Math.min(this.titleFontSize * 3, 30) + '%',
+              Math.min(this.titleFontSize * 5.5, 55) + '%'
+            ],
+            center: ['32%', '50%'],
             label: {
-              fontSize: fontSize * 0.8
+              fontSize: Math.min(this.titleFontSize * 0.65, 12),
+              lineHeight: Math.min(this.titleFontSize * 0.9, 16),
+              edgeDistance: Math.min(this.titleFontSize * 1.5, 20) + '%'
+            },
+            labelLine: {
+              length: Math.min(this.titleFontSize * 0.6, 10),
+              length2: Math.min(this.titleFontSize * 0.6, 10)
             }
           }
         ]
       }
+      
       this.chartInstance.setOption(adapterOption)
       this.chartInstance.resize()
-    },
-    handleSelect(type) {
-      this.currentType = type
-      this.updateChart()
     }
+  },
+  computed: {
+    showTitle() {
+      return this.innerTitle
+    },
+    comStyle() {
+      return {
+        fontSize: this.titleFontSize + 'px',
+        color: getThemeValue(this.theme).titleColor
+      }
+    },
+    ...mapState(['theme'])
   },
   watch: {
     theme() {
       this.chartInstance.dispose()
       this.initChart()
-      this.screenAdapter()
       this.updateChart()
+      this.screenAdapter()
     }
   }
 }
 </script>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
 .com-container {
   position: relative;
   width: 100%;
@@ -325,49 +292,58 @@ export default {
   background: linear-gradient(to bottom, rgba(6, 30, 65, 0.6), rgba(6, 30, 65, 0.8));
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .title {
   position: absolute;
-  left: 35px;
+  left: 20px;
   top: 20px;
   z-index: 9;
-  color: white;
   font-weight: bold;
-  text-shadow: 0 0 10px rgba(0, 100, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: calc(100% - 70px);
+  width: calc(100% - 40px);
+  height: 40px;
+  text-shadow: 0 0 10px rgba(0, 100, 255, 0.6);
+}
 
-  .category {
-    display: flex;
-    margin-right: 35px;
+.type-selector {
+  display: flex;
+  margin-right: 20px;
+  flex-wrap: nowrap;
+  
+  .type-item {
+    padding: 2px 10px;
+    margin: 0 5px;
+    font-size: 0.8em;
+    border-radius: 15px;
+    background: rgba(61, 85, 125, 0.4);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
     
-    .category-item {
-      padding: 2px 12px;
-      margin: 0 3px;
-      cursor: pointer;
-      border-radius: 10px;
-      transition: all 0.3s;
-      background: rgba(255, 255, 255, 0.1);
-      font-size: 0.85em;
-      
-      &:hover {
-        background: rgba(255, 255, 255, 0.2);
-      }
-      
-      &.active {
-        background: rgba(92, 153, 255, 0.5);
-        box-shadow: 0 0 10px rgba(92, 153, 255, 0.3);
-      }
+    &:hover {
+      background: rgba(61, 85, 125, 0.7);
+      color: #fff;
+    }
+    
+    &.active {
+      background: rgba(0, 152, 217, 0.4);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(0, 152, 217, 0.3);
     }
   }
 }
 
 .com-chart {
   width: 100%;
-  height: 100%;
-  padding: 10px;
+  height: calc(100% - 40px);
+  margin-top: 40px;
+  position: relative;
 }
-</style> 
+</style>

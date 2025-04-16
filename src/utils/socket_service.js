@@ -27,48 +27,61 @@ export default class SocketService {
 
   //  定义连接服务器的方法
   connect() {
-    // 连接服务器
     if (!window.WebSocket) {
-      return console.log('您的浏览器不支持WebSocket')
+      console.warn('当前浏览器不支持WebSocket')
+      return
     }
-    this.ws = new WebSocket('ws://localhost:9998')
-
-    // 连接成功的事件
-    this.ws.onopen = () => {
-      console.log('连接服务端成功了')
-      this.connected = true
-      // 重置重新连接的次数
-      this.connectRetryCount = 0
+    if (this.connected) {
+      console.warn('WebSocket已连接')
+      return
     }
-    // 1.连接服务端失败
-    // 2.当连接成功之后, 服务器关闭的情况
-    this.ws.onclose = () => {
-      console.log('连接服务端失败')
+    
+    try {
+      this.ws = new WebSocket('ws://localhost:9998')
       this.connected = false
-      this.connectRetryCount++
-      setTimeout(() => {
-        this.connect()
-      }, 500 * this.connectRetryCount)
-    }
-    // 得到服务端发送过来的数据
-    this.ws.onmessage = msg => {
-      console.log('从服务端获取到了数据')
-      // 真正服务端发送过来的原始数据时在msg中的data字段
-      // console.log(msg.data)
-      const recvData = JSON.parse(msg.data)
-      const socketType = recvData.socketType
-      // 判断回调函数是否存在
-      if (this.callBackMapping[socketType]) {
-        const action = recvData.action
-        if (action === 'getData') {
-          const realData = JSON.parse(recvData.data)
-          this.callBackMapping[socketType].call(this, realData)
-        } else if (action === 'fullScreen') {
-          this.callBackMapping[socketType].call(this, recvData)
-        } else if (action === 'themeChange') {
-          this.callBackMapping[socketType].call(this, recvData)
+      this.connectRetryCount = 0
+      
+      this.ws.onopen = () => {
+        console.log('WebSocket连接成功')
+        this.connected = true
+        this.connectRetryCount = 0
+      }
+      
+      this.ws.onclose = () => {
+        console.warn('WebSocket连接断开')
+        this.connected = false
+        this.connectRetryCount++
+        if (this.connectRetryCount <= 3) {
+          setTimeout(() => {
+            this.connect()
+          }, 500 * this.connectRetryCount)
         }
       }
+      
+      this.ws.onerror = () => {
+        console.error('WebSocket连接错误')
+        this.connected = false
+        this.connectRetryCount++
+      }
+      
+      this.ws.onmessage = msg => {
+        const recvData = JSON.parse(msg.data)
+        const socketType = recvData.socketType
+        if (this.callBackMapping[socketType]) {
+          const action = recvData.action
+          if (action === 'getData') {
+            const realData = JSON.parse(recvData.data)
+            this.callBackMapping[socketType].call(this, realData)
+          } else if (action === 'fullScreen') {
+            this.callBackMapping[socketType].call(this, recvData)
+          } else if (action === 'themeChange') {
+            this.callBackMapping[socketType].call(this, recvData)
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('WebSocket连接失败，使用模拟数据')
+      this.connected = false
     }
   }
 
@@ -84,15 +97,16 @@ export default class SocketService {
 
   // 发送数据的方法
   send (data) {
-    // 判断此时此刻有没有连接成功
     if (this.connected) {
       this.sendRetryCount = 0
       this.ws.send(JSON.stringify(data))
     } else {
       this.sendRetryCount++
-      setTimeout(() => {
-        this.send(data)
-      }, this.sendRetryCount * 500)
+      if (this.sendRetryCount <= 3) {
+        setTimeout(() => {
+          this.send(data)
+        }, 500 * this.sendRetryCount)
+      }
     }
   }
 }

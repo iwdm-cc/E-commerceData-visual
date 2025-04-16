@@ -19,6 +19,12 @@ import {getThemeValue} from '../../utils/theme_utils'
 
 export default {
   name: "RevenueTrend",
+  props: {
+    data: {
+      type: Object,
+      default: () => ({})
+    }
+  },
   data() {
     return {
       chartInstance: null,
@@ -28,23 +34,35 @@ export default {
       titleFontSize: 0,
     }
   },
-  created(){
-    this.$socket.registerCallBack('revenueTrendData',this.getData)
+  created() {
+    // 如果有传入数据，直接使用
+    if (Object.keys(this.data).length > 0) {
+      this.allData = this.data
+    } else {
+      // 否则注册 socket 回调
+      this.$socket.registerCallBack('revenueTrendData', this.getData)
+    }
   },
   mounted() {
     this.initChart()
-    this.$socket.send({
-      action:'getData',
-      socketType:'revenueTrendData',
-      chartName:'revenueTrend',
-      value:''
-    })
+    if (!this.allData) {
+      this.$socket.send({
+        action: 'getData',
+        socketType: 'revenueTrendData',
+        chartName: 'revenueTrend',
+        value: ''
+      })
+    } else {
+      this.updateChart()
+    }
     window.addEventListener('resize', this.screenUpdate)
     this.screenUpdate()
   },
   destroyed() {
     window.removeEventListener('resize', this.screenUpdate)
-    this.$socket.unRegisterCallBack('revenueTrendData')
+    if (!this.data) {
+      this.$socket.unRegisterCallBack('revenueTrendData')
+    }
   },
   methods: {
     initChart() {
@@ -52,7 +70,9 @@ export default {
       const initOption = {
         grid: {
           top: '27%',
-          bottom: '7%',
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
           containLabel: true
         },
         tooltip: {
@@ -63,15 +83,32 @@ export default {
         },
         legend: {
           left: '10%',
-          top: '17%'
+          top: '17%',
+          textStyle: {
+            color: getThemeValue(this.theme).titleColor
+          }
         },
         xAxis: {
-          type: 'category'
+          type: 'category',
+          axisLine: {
+            lineStyle: {
+              color: getThemeValue(this.theme).titleColor
+            }
+          },
+          axisLabel: {
+            color: getThemeValue(this.theme).titleColor
+          }
         },
         yAxis: {
           type: 'value',
+          axisLine: {
+            lineStyle: {
+              color: getThemeValue(this.theme).titleColor
+            }
+          },
           axisLabel: {
-            formatter: '{value} 万'
+            formatter: '{value} 万',
+            color: getThemeValue(this.theme).titleColor
           }
         }
       }

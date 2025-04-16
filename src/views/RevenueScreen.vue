@@ -14,14 +14,14 @@
       <div class="screen-body">
         <section class="screen-left">
           <div id="left-top" :class="[fullScreenStatus.trend ? 'fullscreen' : '']">
-            <RevenueTrend ref="trend"></RevenueTrend>
+            <RevenueTrend ref="trend" :data="chartData.trendData"></RevenueTrend>
             <div class="resize">
               <span @click="changeSize('trend')"
                     :class="['iconfont', fullScreenStatus.trend ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
             </div>
           </div>
           <div id="left-bottom" :class="[fullScreenStatus.course ? 'fullscreen' : '']">
-            <CourseRevenue ref="course"></CourseRevenue>
+            <CourseRevenue ref="course" :data="chartData.courseData"></CourseRevenue>
             <div class="resize">
               <span @click="changeSize('course')"
                     :class="['iconfont', fullScreenStatus.course ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
@@ -30,14 +30,14 @@
         </section>
         <section class="screen-middle">
           <div id="middle-top" :class="[fullScreenStatus.map ? 'fullscreen' : '']">
-            <RevenueMap ref="map"></RevenueMap>
+            <RevenueMap ref="map" :data="chartData.mapData"></RevenueMap>
             <div class="resize">
               <span @click="changeSize('map')"
                     :class="['iconfont', fullScreenStatus.map ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
             </div>
           </div>
           <div id="middle-bottom" :class="[fullScreenStatus.rank ? 'fullscreen' : '']">
-            <RevenueRank ref="rank"></RevenueRank>
+            <RevenueRank ref="rank" :data="chartData.rankData"></RevenueRank>
             <div class="resize">
               <span @click="changeSize('rank')"
                     :class="['iconfont', fullScreenStatus.rank ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
@@ -46,14 +46,14 @@
         </section>
         <section class="screen-right">
           <div id="right-top" :class="[fullScreenStatus.pie ? 'fullscreen' : '']">
-            <RevenuePie ref="pie"></RevenuePie>
+            <RevenuePie ref="pie" :data="chartData.pieData"></RevenuePie>
             <div class="resize">
               <span @click="changeSize('pie')"
                     :class="['iconfont', fullScreenStatus.pie ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
             </div>
           </div>
           <div id="right-bottom" :class="[fullScreenStatus.table ? 'fullscreen' : '']">
-            <RevenueTable ref="table"></RevenueTable>
+            <RevenueTable ref="table" :data="chartData.tableData"></RevenueTable>
             <div class="resize">
               <span @click="changeSize('table')"
                     :class="['iconfont', fullScreenStatus.table ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
@@ -74,6 +74,7 @@
   import {mapState} from 'vuex'
   import {getThemeValue} from '../utils/theme_utils'
   import {formatDate} from '../utils/utils'
+  import {revenueTrendData, revenueMapData, revenueRankData, revenuePieData, revenueTableData, courseRevenueData} from '../mock/revenue.js'
   
   export default {
     created() {
@@ -82,6 +83,7 @@
     },
     mounted() {
       this.startInterval()
+      this.loadMockData()
     },
     destroyed() {
       this.$socket.unRegisterCallBack('fullScreen')
@@ -98,11 +100,62 @@
           pie: false,
           table: false
         },
-        timeDate:'',
-        timeID: null
+        timeDate: '',
+        timeID: null,
+        chartData: {
+          trendData: {},
+          courseData: {},
+          rankData: {},
+          mapData: [],
+          pieData: {},
+          tableData: {}
+        }
       }
     },
     methods: {
+      loadMockData() {
+        try {
+          console.log('开始加载营收模拟数据')
+          
+          // 确保数据格式正确
+          this.chartData = {
+            trendData: revenueTrendData,
+            courseData: courseRevenueData,
+            rankData: revenueRankData,
+            mapData: revenueMapData,
+            pieData: revenuePieData,
+            tableData: revenueTableData
+          }
+          
+          console.log('营收数据转换完成：', this.chartData)
+          
+          // 使用 $nextTick 确保组件已经挂载
+          this.$nextTick(() => {
+            // 更新每个组件的数据
+            const componentDataMap = {
+              trend: 'trendData',
+              course: 'courseData',
+              map: 'mapData',
+              rank: 'rankData',
+              pie: 'pieData',
+              table: 'tableData'
+            }
+
+            Object.keys(this.$refs).forEach(refKey => {
+              const component = this.$refs[refKey]
+              if (component && typeof component.updateChart === 'function') {
+                const dataKey = componentDataMap[refKey]
+                console.log(`更新组件 ${refKey} 的数据:`, this.chartData[dataKey])
+                component.allData = this.chartData[dataKey]
+                component.updateChart()
+              }
+            })
+          })
+        } catch (error) {
+          console.error('营收数据加载失败：', error)
+          console.error('错误堆栈：', error.stack)
+        }
+      },
       changeSize(chartName) {
         const targetValue = !this.fullScreenStatus[chartName]
         this.$socket.send({
@@ -117,7 +170,11 @@
         const targetValue = data.value
         this.fullScreenStatus[chartName] = targetValue
         this.$nextTick(() => {
-          this.$refs[chartName].screenUpdate()
+          if (chartName === 'trend' || chartName === 'course' || chartName === 'map') {
+            this.$refs[chartName].screenAdapter()
+          } else {
+            this.$refs[chartName].screenUpdate()
+          }
         })
       },
       handleChangeTheme() {

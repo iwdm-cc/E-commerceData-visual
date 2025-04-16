@@ -19,32 +19,48 @@
   
   export default {
     name: "CourseRevenue",
+    props: {
+      data: {
+        type: Object,
+        default: () => ({})
+      }
+    },
     data() {
       return {
         chartInstance: null,
         allData: null,
         ifShowChoice: false,
-        choiceType: 'course', //显示的数据类型
-        titleFontSize: 0,
+        choiceType: 'monthly',
+        titleFontSize: 0
       }
     },
-    created(){
-      this.$socket.registerCallBack('courseRevenueData',this.getData)
+    created() {
+      if (Object.keys(this.data).length > 0) {
+        this.allData = this.data
+      } else {
+        this.$socket.registerCallBack('courseRevenueData', this.getData)
+      }
     },
     mounted() {
       this.initChart()
-      this.$socket.send({
-        action:'getData',
-        socketType:'courseRevenueData',
-        chartName:'courseRevenue',
-        value:''
-      })
+      if (!this.allData) {
+        this.$socket.send({
+          action: 'getData',
+          socketType: 'courseRevenueData',
+          chartName: 'courseRevenue',
+          value: ''
+        })
+      } else {
+        this.updateChart()
+      }
       window.addEventListener('resize', this.screenUpdate)
       this.screenUpdate()
     },
     destroyed() {
       window.removeEventListener('resize', this.screenUpdate)
-      this.$socket.unRegisterCallBack('courseRevenueData')
+      if (!this.data) {
+        this.$socket.unRegisterCallBack('courseRevenueData')
+      }
     },
     methods: {
       initChart() {
@@ -57,34 +73,32 @@
             }
           },
           grid: {
+            top: '20%',
             left: '3%',
             right: '4%',
             bottom: '3%',
             containLabel: true
           },
+          legend: {
+            top: '5%',
+            textStyle: {
+              color: getThemeValue(this.theme).titleColor
+            }
+          },
           xAxis: {
             type: 'category',
-            data: []
+            axisLabel: {
+              color: getThemeValue(this.theme).titleColor,
+              rotate: 30
+            }
           },
           yAxis: {
             type: 'value',
             axisLabel: {
-              formatter: '{value} 万'
+              formatter: '{value} 万',
+              color: getThemeValue(this.theme).titleColor
             }
-          },
-          series: [
-            {
-              name: '课程营收',
-              type: 'bar',
-              data: [],
-              itemStyle: {
-                color: new this.$echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: '#50a3ba' },
-                  { offset: 1, color: '#eac736' }
-                ])
-              }
-            }
-          ]
+          }
         }
         this.chartInstance.setOption(initOption)
       },
@@ -93,15 +107,53 @@
         this.updateChart()
       },
       updateChart() {
-        const dataOption = {
-          xAxis: {
-            data: this.allData[this.choiceType].data.map(item => item.name)
+        if (!this.allData || !this.allData[this.choiceType]) {
+          return
+        }
+        
+        const colorList = [
+          ['#83bff6', '#188df0'],
+          ['#76f2f2', '#188df0'],
+          ['#9fe6b8', '#37a2da']
+        ]
+        
+        const currentData = this.allData[this.choiceType].data
+        const legendData = currentData.map(item => item.name)
+        const xAxisData = currentData.map(item => item.name)
+        
+        const series = [{
+          type: 'bar',
+          data: currentData.map(item => item.value),
+          itemStyle: {
+            color: new this.$echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: colorList[0][0] },
+              { offset: 1, color: colorList[0][1] }
+            ])
           },
-          series: [
-            {
-              data: this.allData[this.choiceType].data.map(item => item.value)
+          emphasis: {
+            itemStyle: {
+              color: new this.$echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: colorList[0][0] },
+                { offset: 1, color: colorList[0][1] }
+              ])
             }
-          ]
+          }
+        }]
+        
+        const dataOption = {
+          title: {
+            text: this.allData[this.choiceType].title,
+            left: 'center',
+            top: '2%',
+            textStyle: {
+              fontSize: this.titleFontSize,
+              color: getThemeValue(this.theme).titleColor
+            }
+          },
+          xAxis: {
+            data: xAxisData
+          },
+          series
         }
         this.chartInstance.setOption(dataOption)
       },
@@ -111,6 +163,24 @@
           title: {
             textStyle: {
               fontSize: this.titleFontSize
+            }
+          },
+          legend: {
+            itemWidth: this.titleFontSize,
+            itemHeight: this.titleFontSize,
+            itemGap: this.titleFontSize,
+            textStyle: {
+              fontSize: this.titleFontSize * 0.8
+            }
+          },
+          xAxis: {
+            axisLabel: {
+              fontSize: this.titleFontSize * 0.8
+            }
+          },
+          yAxis: {
+            axisLabel: {
+              fontSize: this.titleFontSize * 0.8
             }
           }
         }
@@ -135,21 +205,21 @@
       },
       showTitle() {
         if (!this.allData) {
-          return []
+          return ''
         } else {
           return this.allData[this.choiceType].title
         }
       },
       comStyle() {
         return {
-          fontSize: this.titleFontSize /1.15 + 'px' ,
-          color:getThemeValue(this.theme).titleColor
+          fontSize: this.titleFontSize / 1.15 + 'px',
+          color: getThemeValue(this.theme).titleColor
         }
       },
-      marginStyle(){
-        return {marginLeft: this.titleFontSize/2.5 + 'px'}
+      marginStyle() {
+        return {marginLeft: this.titleFontSize / 2.5 + 'px'}
       },
-      ...mapState(['theme']),
+      ...mapState(['theme'])
     },
     watch: {
       theme() {

@@ -35,18 +35,18 @@ export default class SocketService {
       console.warn('WebSocket已连接')
       return
     }
-    
+
     try {
-      this.ws = new WebSocket('ws://localhost:9998')
+      this.ws = new WebSocket('ws://localhost:8000/ws')
       this.connected = false
       this.connectRetryCount = 0
-      
+
       this.ws.onopen = () => {
         console.log('WebSocket连接成功')
         this.connected = true
         this.connectRetryCount = 0
       }
-      
+
       this.ws.onclose = () => {
         console.warn('WebSocket连接断开')
         this.connected = false
@@ -57,15 +57,17 @@ export default class SocketService {
           }, 500 * this.connectRetryCount)
         }
       }
-      
+
       this.ws.onerror = () => {
         console.error('WebSocket连接错误')
         this.connected = false
         this.connectRetryCount++
       }
-      
+
       this.ws.onmessage = msg => {
         const recvData = JSON.parse(msg.data)
+        console.log(recvData,'recvData')
+        this.callBackMapping['socketDataType'].call(this,recvData)
         const socketType = recvData.socketType
         if (this.callBackMapping[socketType]) {
           const action = recvData.action

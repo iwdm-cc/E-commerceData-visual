@@ -37,7 +37,7 @@ export default class SocketService {
     }
 
     try {
-      this.ws = new WebSocket('ws://localhost:8000/ws')
+      this.ws = new WebSocket('ws://localhost:8000/ws/refund')
       this.connected = false
       this.connectRetryCount = 0
 
@@ -67,7 +67,7 @@ export default class SocketService {
       this.ws.onmessage = msg => {
         const recvData = JSON.parse(msg.data)
         console.log(recvData,'recvData')
-        this.callBackMapping['socketDataType'].call(this,recvData)
+        // this.callBackMapping['socketDataType'].call(this,recvData)
         const socketType = recvData.socketType
         if (this.callBackMapping[socketType]) {
           const action = recvData.action

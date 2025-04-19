@@ -5,7 +5,7 @@
         <img :src="headerSrc" alt="">
       </div>
       <span class="logo"></span>
-      <span class="title">博学谷退费分析{{ socketData }}</span>
+      <span class="title">博学谷 退费综合分析系统{{ socketData }}</span>
       <p>{{ socketData }}</p>
       <div class="title-right">
         <img :src="themeSrc" class="qiehuan" @click="handleChangeTheme">
@@ -31,7 +31,9 @@
       </section>
       <section class="screen-middle">
         <div id="middle-top" :class="[fullScreenStatus.map ? 'fullscreen' : '']">
-          <RefundMap ref="map" :data="chartData.mapData"></RefundMap>
+          <div style="display: flex; gap: 20px; margin-top: 20px;">
+            <RefundBarChart :courseRank="courseRank" style="flex: 1"/>
+          </div>
           <div class="resize">
               <span @click="changeSize('map')"
                     :class="['iconfont', fullScreenStatus.map ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
@@ -47,7 +49,8 @@
       </section>
       <section class="screen-right">
         <div id="right-top" :class="[fullScreenStatus.pie ? 'fullscreen' : '']">
-          <RefundPie ref="pie" :data="chartData.pieData"></RefundPie>
+          <RefundPie ref="pie" :data="chartData.pieData" :reasonDistribution="reasonDistribution"
+                     style="flex: 1"></RefundPie>
           <div class="resize">
               <span @click="changeSize('pie')"
                     :class="['iconfont', fullScreenStatus.pie ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
@@ -59,6 +62,7 @@
               <span @click="changeSize('table')"
                     :class="['iconfont', fullScreenStatus.table ? 'icon-compress-alt' : 'icon-expand-alt']"></span>
           </div>
+
         </div>
       </section>
     </div>
@@ -77,6 +81,8 @@ import {getThemeValue} from '@/utils/theme_utils'
 import {formatDate} from '@/utils/utils'
 import * as refundData from '../mock/refundData.js'
 import SocketService from "@/utils/socket_service";
+import RefundLineChart from "@/views/RefundLineChart.vue";
+import RefundBarChart from "@/views/RefundBarChart.vue";
 
 export default {
   created() {
@@ -108,10 +114,17 @@ export default {
         mapData: [],
         pieData: {},
         tableData: {}
-      }
+      },
+      ws: null,
+      refundTimestamps: [],
+      refundAmounts: [],
+      reasonDistribution: {},
+      courseRank: {}
+
     }
   },
   mounted() {
+    this.setupWebSocket()
     this.startInterval()
     this.loadMockData()
     // 连接 WebSocket
@@ -125,6 +138,23 @@ export default {
     SocketService.Instance.unRegisterCallBack('socketDataType');
   },
   methods: {
+    setupWebSocket() {
+      this.ws = new WebSocket('ws://localhost:8000/ws/refund')
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+
+        this.refundTimestamps.push(data.timestamp)
+        this.refundAmounts.push(data.refund_amount)
+
+        if (this.refundTimestamps.length > 20) {
+          this.refundTimestamps.shift()
+          this.refundAmounts.shift()
+        }
+
+        this.reasonDistribution = data.reason_distribution
+        this.courseRank = data.course_rank
+      }
+    },
     // WebSocket 数据处理回调
     handleSocketData(data) {
       this.socketData = data;
@@ -249,6 +279,8 @@ export default {
     }
   },
   components: {
+    RefundBarChart,
+    RefundLineChart,
     RefundTrend,
     RefundMap,
     RefundRank,
@@ -313,7 +345,7 @@ export default {
     position: absolute;
     left: 50%;
     top: 50%;
-    font-size: 20px;
+    font-size: 38px;
     transform: translate(-50%, -50%);
   }
 
@@ -356,7 +388,7 @@ export default {
     margin-right: 10px;
 
     #middle-top {
-      height: 56%;
+      height: 52%;
       position: relative;
       margin-bottom: 10px;
     }

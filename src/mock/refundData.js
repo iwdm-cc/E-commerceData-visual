@@ -81,11 +81,11 @@ const rankData = {
   course: {
     title: '课程退款排行',
     data: [
-      { name: 'Java高级开发', value: 200 },
-      { name: 'Python数据分析', value: 180 },
-      { name: '前端工程化实践', value: 150 },
-      { name: 'UI设计进阶', value: 120 },
-      { name: '大数据实战', value: 100 }
+      { name: 'JavaEE在线就业班', value: 52 },
+      { name: '零基础大数据在线就业班', value: 34 },
+      { name: '云计算大数据在线就业班', value: 27 },
+      { name: 'JavaEE在线就业班2.0', value: 24 },
+      { name: 'UI/UE设计在线就业班', value: 21 }
     ]
   },
   teacher: {

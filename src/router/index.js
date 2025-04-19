@@ -18,7 +18,8 @@ const routes = [
   {
     path:'/refund',
     name:'refund',
-    component:RefundScreen
+    component:RefundScreen,
+    meta: { title: '退费综合分析系统' }
   }
 ]
 

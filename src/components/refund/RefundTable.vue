@@ -1,400 +1,172 @@
 <template>
+
   <div class="com-container">
     <div class="title" :style="comStyle">
-      <span>{{ '▎'+ showTitle}}</span>
-      <span class="iconfont title-icon" :style="comStyle" @click="ifShowChoice = !ifShowChoice">&#xe6eb</span>
-      <div class="select-con" v-show="ifShowChoice" :style="marginStyle">
-        <div class="select-item" v-for="item in selectTypes" :key="item.key" @click="handleChoice(item.key)">
-          {{item.text}}
-        </div>
-      </div>
+      <span>退费综合分析</span>
     </div>
-    <div class="com-chart" ref="RefundTable"></div>
+
+    <div style="margin-top: 50px">
+      <RefundLineChart :timestamps="refundTimestamps" :amounts="refundAmounts"/>
+
+    </div>
   </div>
 </template>
 
 <script>
-import {mapState} from 'vuex'
-import {getThemeValue} from '../../utils/theme_utils'
+import * as echarts from "echarts";
+import RefundLineChart from "@/views/RefundLineChart.vue";
+import RefundBarChart from "@/views/RefundBarChart.vue";
+import {getThemeValue} from "@/utils/theme_utils";
+import {mapState} from "vuex";
 
 export default {
-  name: "RefundTable",
-  props: {
-    data: {
-      type: Object,
-      default: () => ({})
-    }
-  },
+  name: "OrderChart",
+  components: {RefundBarChart, RefundLineChart},
   data() {
     return {
       chartInstance: null,
-      currentPage: 1,
-      pageSize: 5,
-      allData: null,
-      screenWidth: 0,
-      ifShowChoice: false,
-      choiceType: 'detail', //显示的数据类型
-      titleFontSize: 0,
-      colorList: [
-        { start: '#5470c6', end: '#91cc75' },
-        { start: '#fac858', end: '#ee6666' },
-        { start: '#73c0de', end: '#3ba272' },
-        { start: '#fc8452', end: '#9a60b4' },
-        { start: '#ea7ccc', end: '#5470c6' },
-        { start: '#91cc75', end: '#fac858' },
-        { start: '#ee6666', end: '#73c0de' },
-        { start: '#3ba272', end: '#fc8452' },
-        { start: '#9a60b4', end: '#ea7ccc' },
-        { start: '#ea7ccc', end: '#5470c6' }
-      ]
-    }
-  },
-  computed: {
-    paginatedData() {
-      if (!this.allData || !this.allData.data) return []
-      
-      const start = (this.currentPage - 1) * this.pageSize
-      const end = start + this.pageSize
-      return this.allData.data.slice(start, end)
-    },
-    totalPages() {
-      if (!this.allData || !this.allData.data) return 0
-      return Math.ceil(this.allData.data.length / this.pageSize)
-    }
-  },
-  created() {
-    if (this.data && Object.keys(this.data).length > 0) {
-      this.allData = this.data
-    } else {
-      this.$socket.registerCallBack('refundTableData', this.getData)
-    }
+      timestamps: [],
+      prices: [],
+      ws: null,
+      refundTimestamps: [],
+      refundAmounts: [],
+      reasonDistribution: {},
+      courseRank: {},
+
+    };
   },
   mounted() {
-    this.screenWidth = window.innerWidth
-    this.initChart()
-    if (!this.allData) {
-      this.$socket.send({
-        action: 'getData',
-        socketType: 'refundTableData',
-        chartName: 'refund',
-        value: ''
-      })
-    }
-    window.addEventListener('resize', this.screenAdapter)
-    this.screenAdapter()
-  },
-  destroyed() {
-    window.removeEventListener('resize', this.screenAdapter)
-    if(!this.data || Object.keys(this.data).length === 0) {
-      this.$socket.unRegisterCallBack('refundTableData')
-    }
-    this.chartInstance.dispose()
-  },
-  methods: {
-    initChart() {
-      this.chartInstance = this.$echarts.init(this.$refs.RefundTable, 'chalk')
-      const initOption = {
-        grid: {
-          top: '15%',
-          left: '3%',
-          right: '4%',
-          bottom: '15%',
-          containLabel: true
-        },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'shadow'
-          },
-          textStyle: {
-            fontSize: 14
-          },
-          formatter: '{b}<br/>{c}元'
-        },
-        xAxis: {
-          type: 'category',
-          data: [],
-          axisLine: {
-            lineStyle: {
-              color: 'rgba(255, 255, 255, 0.3)'
-            }
-          },
-          axisLabel: {
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontSize: 14
-          }
-        },
-        yAxis: {
-          type: 'value',
-          name: '金额',
-          nameTextStyle: {
-            fontSize: 14,
-            color: 'rgba(255, 255, 255, 0.6)'
-          },
-          axisLine: {
-            show: true,
-            lineStyle: {
-              color: 'rgba(255, 255, 255, 0.3)'
-            }
-          },
-          axisLabel: {
-            color: 'rgba(255, 255, 255, 0.6)',
-            fontSize: 14
-          },
-          splitLine: {
-            lineStyle: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
-          }
-        },
-        series: [
-          {
-            type: 'bar',
-            data: [],
-            barWidth: '35%',
-            itemStyle: {
-              color: params => {
-                const colorList = [
-                  '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
-                  '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'
-                ]
-                return colorList[params.dataIndex % colorList.length]
-              },
-              borderRadius: [5, 5, 0, 0]
-            },
-            emphasis: {
-              itemStyle: {
-                borderWidth: 3,
-                borderColor: '#fff',
-                shadowBlur: 10,
-                shadowColor: 'rgba(255, 255, 255, 0.3)'
-              }
-            }
-          }
-        ]
-      }
-      this.chartInstance.setOption(initOption)
-      
-      if (this.allData) {
-        this.updateChart()
-      }
-    },
-    screenAdapter() {
-      this.screenWidth = window.innerWidth
-      const adaptionSize = (this.screenWidth / 100) * 0.8
-      
-      const adaptionOption = {
-        xAxis: {
-          axisLabel: {
-            fontSize: adaptionSize
-          }
-        },
-        yAxis: {
-          nameTextStyle: {
-            fontSize: adaptionSize
-          },
-          axisLabel: {
-            fontSize: adaptionSize
-          }
-        },
-        tooltip: {
-          textStyle: {
-            fontSize: adaptionSize
-          }
-        }
-      }
-      
-      this.chartInstance.setOption(adaptionOption)
-      this.chartInstance.resize()
-    },
-    getData(ret) {
-      this.allData = ret
-      this.updateChart()
-    },
-    updateChart() {
-      if (!this.allData) return
-      
-      const currentData = this.allData[this.choiceType]
-      if (!currentData || !currentData.data) return
-      
-      console.log('当前表格数据：', currentData)
-      
-      const tableData = currentData.data.map(item => ({
-        name: item.name,
-        value: item.value
-      }))
-      
-      const option = {
-        grid: {
-          top: '15%',
-          left: '3%',
-          right: '6%',
-          bottom: '3%',
-          containLabel: true
-        },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'shadow'
-          }
-        },
-        xAxis: {
-          type: 'category',
-          data: tableData.map(item => item.name),
-          axisLabel: {
-            interval: 0,
-            rotate: 45,
-            color: 'rgba(255, 255, 255, 0.7)'
-          },
-          axisLine: {
-            lineStyle: {
-              color: 'rgba(255, 255, 255, 0.2)'
-            }
-          }
-        },
-        yAxis: {
-          type: 'value',
-          axisLabel: {
-            color: 'rgba(255, 255, 255, 0.7)'
-          },
-          axisLine: {
-            show: true,
-            lineStyle: {
-              color: 'rgba(255, 255, 255, 0.2)'
-            }
-          },
-          splitLine: {
-            lineStyle: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            }
-          }
-        },
-        series: [
-          {
-            name: '数量',
-            type: 'bar',
-            data: tableData.map((item, index) => ({
-              value: item.value,
-              itemStyle: {
-                color: new this.$echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: this.colorList[index % this.colorList.length].start },
-                  { offset: 1, color: this.colorList[index % this.colorList.length].end }
-                ])
-              }
-            })),
-            barWidth: '45%',
-            label: {
-              show: true,
-              position: 'top',
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
-          }
-        ]
-      }
-      
-      this.chartInstance.setOption(option)
-    },
-    screenUpdate() {
-      this.titleFontSize = this.$refs.RefundTable.offsetWidth / 100 * 3.6
-      const adapterOption = {
-        title: {
-          textStyle: {
-            fontSize: this.titleFontSize
-          }
-        }
-      }
-      this.chartInstance.setOption(adapterOption)
-      this.chartInstance.resize()
-    },
-    handleChoice(type) {
-      this.choiceType = type
-      this.updateChart()
-      this.ifShowChoice = false
-    },
-    changePage(newPage) {
-      this.currentPage = newPage
-      this.updateChart()
-    },
-    prevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage--
-        this.updateChart()
-      }
-    },
-    nextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage++
-        this.updateChart()
-      }
-    }
+    this.setupWebSocket()
   },
   computed: {
-    selectTypes() {
-      if (!this.allData) {
-        return []
-      } else {
-        return this.allData.type.filter(item => {
-          return item.key !== this.choiceType
-        })
-      }
-    },
-    showTitle() {
-      if (!this.allData) {
-        return []
-      } else {
-        return this.allData[this.choiceType].title
-      }
-    },
+
     comStyle() {
       return {
-        fontSize: this.titleFontSize /1.15 + 'px' ,
-        color:getThemeValue(this.theme).titleColor
+        fontSize: this.titleFontSize + 'px',
+        color: getThemeValue(this.theme).titleColor
       }
     },
-    marginStyle(){
-      return {marginLeft: this.titleFontSize/2.5 + 'px'}
-    },
-    ...mapState(['theme']),
+    ...mapState(['theme'])
   },
-  watch: {
-    theme() {
-      this.chartInstance.dispose()
-      this.initChart()
-      this.screenUpdate()
-      this.updateChart()
-    },
-    data: {
-      handler(newValue) {
-        if (newValue && Object.keys(newValue).length > 0) {
-          this.allData = newValue
-          this.$nextTick(() => {
-            this.updateChart()
-          })
-        }
-      },
-      deep: true
+  beforeDestroy() {
+    if (this.ws) {
+      this.ws.close();
     }
-  }
-}
+  },
+  methods: {
+    setupWebSocket() {
+      this.ws = new WebSocket('ws://localhost:8000/ws/refund')
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+
+        this.refundTimestamps.push(data.timestamp)
+        this.refundAmounts.push(data.refund_amount)
+
+        if (this.refundTimestamps.length > 20) {
+          this.refundTimestamps.shift()
+          this.refundAmounts.shift()
+        }
+
+        this.reasonDistribution = data.reason_distribution
+        this.courseRank = data.course_rank
+      }
+    },
+    initChart() {
+      this.chartInstance = echarts.init(this.$refs.chart);
+      this.chartInstance.setOption({
+        title: {text: "订单金额折线图"},
+        tooltip: {trigger: "axis"},
+        xAxis: {type: "category", data: []},
+        yAxis: {type: "value", name: "金额（元）"},
+        series: [{name: "金额", type: "line", data: [], smooth: true}],
+      });
+    },
+    connectWebSocket() {
+      this.ws = new WebSocket("ws://localhost:8000/ws/orders");
+
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (this.timestamps.length >= 10) {
+          this.timestamps.shift();
+          this.prices.shift();
+        }
+        this.timestamps.push(data.timestamp);
+        this.prices.push(data.price);
+
+        this.chartInstance.setOption({
+          xAxis: {data: this.timestamps},
+          series: [{data: this.prices}],
+        });
+      };
+
+      this.ws.onclose = () => {
+        console.log("WebSocket 已关闭");
+      };
+    },
+  },
+};
 </script>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
+.com-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, rgba(6, 30, 65, 0.6), rgba(6, 30, 65, 0.8));
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
 .title {
   position: absolute;
-  left: 35px;
+  left: 20px;
   top: 20px;
   z-index: 9;
-  color: white;
-  font-weight:bold;
-  .title-icon {
-    margin-left: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 40px);
+  height: 40px;
+  text-shadow: 0 0 10px rgba(0, 100, 255, 0.6);
+}
+
+.type-selector {
+  display: flex;
+  margin-right: 20px;
+  flex-wrap: nowrap;
+
+  .type-item {
+    padding: 2px 10px;
+    margin: 0 5px;
+    font-size: 0.8em;
+    border-radius: 15px;
+    background: rgba(61, 85, 125, 0.4);
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
-  }
-  .select-con{
-    background-color: #222733;
-    .select-item {
-      cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+
+    &:hover {
+      background: rgba(61, 85, 125, 0.7);
+      color: #fff;
+    }
+
+    &.active {
+      background: rgba(0, 152, 217, 0.4);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(0, 152, 217, 0.3);
     }
   }
 }
-</style> 
+
+.com-chart {
+  width: 100%;
+  height: calc(100% - 40px);
+  margin-top: 40px;
+  position: relative;
+}
+</style>

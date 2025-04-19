@@ -3,8 +3,8 @@
     <div class="title" :style="comStyle">
       <span>{{ '▎' + showTitle }}</span>
       <div class="rank-type">
-        <div 
-          v-for="(item, index) in rankTypes" 
+        <div
+          v-for="(item, index) in rankTypes"
           :key="index"
           :class="['rank-type-item', currentType === item.type ? 'active' : '']"
           @click="handleRankTypeClick(item.type)"
@@ -20,6 +20,7 @@
 <script>
 import { mapState } from 'vuex'
 import { getThemeValue } from '../../utils/theme_utils'
+import axios from "axios";
 
 export default {
   name: "RefundRank",
@@ -52,6 +53,8 @@ export default {
     }
   },
   created() {
+
+    this.fetchData()
     if (this.data && Object.keys(this.data).length > 0) {
       this.allData = this.data
     } else {
@@ -61,13 +64,13 @@ export default {
   mounted() {
     this.initChart()
     this.screenAdapter()
-    
+
     if (this.allData) {
       this.updateChart()
     } else {
       this.requestData()
     }
-    
+
     window.addEventListener('resize', this.screenAdapter)
   },
   destroyed() {
@@ -78,6 +81,11 @@ export default {
     this.chartInstance && this.chartInstance.dispose()
   },
   methods: {
+    async fetchData() {
+      const response = await axios.get('http://127.0.0.1:8000/api/refund-course-summary')
+      const data = response.data.data() || []
+      console.log('退款课程数据:', data)
+    },
     initChart() {
       this.chartInstance = this.$echarts.init(this.$refs.refund_rank, this.theme)
       const option = {
@@ -91,7 +99,7 @@ export default {
           borderWidth: 0,
           formatter: (params) => {
             const data = params[0]
-            return `${data.name}<br/>${data.marker} 退款金额: ${data.value} 元`
+            return `${data.name}<br/>${data.marker} 退款申请数量: ${data.value} `
           }
         },
         grid: {
@@ -149,7 +157,7 @@ export default {
         },
         series: [
           {
-            name: '退款金额',
+            name: '退款申请数量',
             type: 'bar',
             data: [],
             barWidth: '45%',
@@ -189,15 +197,17 @@ export default {
     },
     updateChart() {
       if (!this.allData) return
-      
+
       const currentData = this.allData[this.currentType]
       if (!currentData || !currentData.data) return
-      
+
       console.log('当前排行数据：', currentData)
-      
-      const names = currentData.data.map(item => item.name)
-      const values = currentData.data.map(item => item.value)
-      
+
+      const sortedData = currentData.data.sort((a, b) => a.value - b.value)
+
+      const names = sortedData.map(item => item.name)
+      const values = sortedData.map(item => item.value)
+
       const option = {
         grid: {
           top: '15%',
@@ -255,7 +265,7 @@ export default {
           }
         ]
       }
-      
+
       this.chartInstance.setOption(option)
     },
     handleRankTypeClick(type) {
@@ -268,7 +278,7 @@ export default {
     },
     screenAdapter() {
       this.titleFontSize = this.$refs.refund_rank.offsetWidth / 100 * 3.6
-      
+
       const adaptOption = {
         grid: {
           left: this.titleFontSize,
@@ -294,7 +304,7 @@ export default {
           }
         ]
       }
-      
+
       this.chartInstance.setOption(adaptOption)
       this.chartInstance.resize()
     }
@@ -349,7 +359,7 @@ export default {
 .rank-type {
   display: flex;
   margin-right: 20px;
-  
+
   .rank-type-item {
     padding: 2px 10px;
     margin: 0 5px;
@@ -359,12 +369,12 @@ export default {
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     transition: all 0.3s;
-    
+
     &:hover {
       background: rgba(61, 85, 125, 0.7);
       color: #fff;
     }
-    
+
     &.active {
       background: rgba(0, 152, 217, 0.4);
       color: #fff;
@@ -377,4 +387,4 @@ export default {
   width: 100%;
   height: 100%;
 }
-</style> 
+</style>

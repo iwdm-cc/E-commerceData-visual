@@ -8,7 +8,7 @@
       <span class="title">博学谷 退费综合分析系统{{ socketData }}</span>
       <p>{{ socketData }}</p>
       <div class="title-right">
-        <img :src="themeSrc" class="qiehuan" @click="handleChangeTheme">
+<!--        <img :src="themeSrc" class="qiehuan" @click="handleChangeTheme">-->
         <span class="datetime">{{ timeDate }}</span>
       </div>
     </header>
